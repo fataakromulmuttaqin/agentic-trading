@@ -1,27 +1,16 @@
 import { NextResponse } from 'next/server';
-import { execa } from 'execa';
 
-const KRAKEN_CLI_PATH = process.env.KRAKEN_CLI_PATH || `${process.env.HOME}/ruangkerja/dashboard-trading/kraken-cli/target/release/kraken`;
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, pair, volume, type, price } = body;
-
-    const args = ['order', action, pair, volume.toString()];
-    if (type) args.push('--type', type);
-    if (price) args.push('--price', price.toString());
-    args.push('-o', 'json');
-
-    const { stdout } = await execa(KRAKEN_CLI_PATH, args, {
-      env: {
-        KRAKEN_API_KEY: process.env.KRAKEN_API_KEY || '',
-        KRAKEN_API_SECRET: process.env.KRAKEN_API_SECRET || '',
-      },
-      stderr: 'ignore',
+    const res = await fetch(`${BACKEND_URL}/api/trade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
-
-    const data = JSON.parse(stdout);
+    const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -33,16 +22,12 @@ export async function DELETE(request: Request) {
   try {
     const body = await request.json();
     const { txid } = body;
-
-    const { stdout } = await execa(KRAKEN_CLI_PATH, ['order', 'cancel', txid, '-o', 'json'], {
-      env: {
-        KRAKEN_API_KEY: process.env.KRAKEN_API_KEY || '',
-        KRAKEN_API_SECRET: process.env.KRAKEN_API_SECRET || '',
-      },
-      stderr: 'ignore',
+    const res = await fetch(`${BACKEND_URL}/api/trade/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ txid }),
     });
-
-    const data = JSON.parse(stdout);
+    const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
