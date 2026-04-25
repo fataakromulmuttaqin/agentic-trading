@@ -5,6 +5,7 @@ import { createChart, IChartApi, ISeriesApi, Time, CandlestickData, HistogramDat
 import { Maximize2, Volume2, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMarket } from '@/components/providers/MarketProvider';
+import { PairSelector } from './PairSelector';
 
 const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'] as const;
 type Interval = (typeof INTERVALS)[number];
@@ -73,10 +74,15 @@ interface WsMessage {
   data: KlineMessage;
 }
 
-export function ChartArea() {
+interface ChartAreaProps {
+  symbol?: string;
+  onSymbolChange?: (symbol: string) => void;
+}
+
+export function ChartArea({ symbol: propSymbol, onSymbolChange }: ChartAreaProps = {}) {
   const { tickers } = useMarket();
-  const [interval, setInterval] = useState<Interval>('15m');
-  const [symbol] = useState('BTCUSDT');
+  const [interval, setInterval] = useState<Interval>('1h');
+  const [symbol, setSymbol] = useState(propSymbol || 'BTCUSDT');
   const [loading, setLoading] = useState(true);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
   const [priceChange, setPriceChange] = useState<{ value: number; pct: number } | null>(null);
@@ -355,21 +361,31 @@ export function ChartArea() {
     <div className="h-full flex flex-col relative">
       {/* Header Bar */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-surface)]/50 shrink-0">
-        <div className="flex items-center gap-1">
-          {INTERVALS.map((int) => (
-            <button
-              key={int}
-              onClick={() => setInterval(int)}
-              className={cn(
-                'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
-                interval === int
-                  ? 'bg-[var(--accent)] text-[var(--bg-void)] font-bold shadow-[0_0_12px_var(--accent-glow)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
-              )}
-            >
-              {int}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <PairSelector
+            activeSymbol={symbol}
+            onSymbolChange={(newSym) => {
+              setSymbol(newSym);
+              onSymbolChange?.(newSym);
+            }}
+          />
+          <div className="h-6 w-px bg-white/10" />
+          <div className="flex items-center gap-1">
+            {INTERVALS.map((int) => (
+              <button
+                key={int}
+                onClick={() => setInterval(int)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
+                  interval === int
+                    ? 'bg-[var(--accent)] text-[var(--bg-void)] font-bold shadow-[0_0_12px_var(--accent-glow)]'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
+                )}
+              >
+                {int}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex items-center gap-1">
           <button className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors">
