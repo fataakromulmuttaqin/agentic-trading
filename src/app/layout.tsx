@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { MarketProvider } from "@/components/providers/MarketProvider";
 
 export const metadata: Metadata = {
   title: "Δ-78 Agentic Trading | AI-Powered Markets",
@@ -28,7 +29,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <MarketProvider>{children}</MarketProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

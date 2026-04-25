@@ -3,27 +3,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMarket } from '@/components/providers/MarketProvider';
 
 interface TickerItem {
   symbol: string;
+  binanceSymbol: string;
   price: string;
   change: string;
   positive: boolean;
 }
 
-const TICKER_ITEMS: TickerItem[] = [
-  { symbol: 'BTC/USD', price: '68,372.45', change: '+5.24%', positive: true },
-  { symbol: 'ETH/USD', price: '3,521.80', change: '+2.15%', positive: true },
-  { symbol: 'SOL/USD', price: '182.45', change: '-0.83%', positive: false },
-  { symbol: 'XRP/USD', price: '0.5842', change: '+0.42%', positive: true },
-  { symbol: 'ADA/USD', price: '0.4521', change: '-1.12%', positive: false },
-  { symbol: 'DOGE/USD', price: '0.1523', change: '+3.21%', positive: true },
-  { symbol: 'AVAX/USD', price: '38.72', change: '+1.87%', positive: true },
-  { symbol: 'DOT/USD', price: '7.34', change: '-0.54%', positive: false },
-  { symbol: 'LINK/USD', price: '14.82', change: '+1.45%', positive: true },
-  { symbol: 'MATIC/USD', price: '0.7182', change: '-0.92%', positive: false },
-  { symbol: 'ATOM/USD', price: '8.42', change: '+0.78%', positive: true },
-  { symbol: 'UNI/USD', price: '9.23', change: '-1.34%', positive: false },
+const TICKER_PAIRS: TickerItem[] = [
+  { symbol: 'BTC/USD', binanceSymbol: 'BTCUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'ETH/USD', binanceSymbol: 'ETHUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'SOL/USD', binanceSymbol: 'SOLUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'XRP/USD', binanceSymbol: 'XRPUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'ADA/USD', binanceSymbol: 'ADAUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'DOGE/USD', binanceSymbol: 'DOGEUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'AVAX/USD', binanceSymbol: 'AVAXUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'DOT/USD', binanceSymbol: 'DOTUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'LINK/USD', binanceSymbol: 'LINKUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'MATIC/USD', binanceSymbol: 'MATICUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'ATOM/USD', binanceSymbol: 'ATOMUSDT', price: '—', change: '—', positive: true },
+  { symbol: 'UNI/USD', binanceSymbol: 'UNIUSDT', price: '—', change: '—', positive: true },
 ];
 
 function TickerCard({ item }: { item: TickerItem }) {
@@ -50,12 +52,22 @@ function TickerCard({ item }: { item: TickerItem }) {
 }
 
 export function RunningTicker() {
+  const { tickers } = useMarket();
   const [offset, setOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>();
 
+  // Merge static pair labels with real ticker data
+  const items: TickerItem[] = TICKER_PAIRS.map((pair) => {
+    const t = tickers[pair.binanceSymbol];
+    if (t) {
+      return { ...pair, price: t.price, change: t.change, positive: t.positive };
+    }
+    return pair;
+  });
+
   // Duplicate items for seamless loop
-  const allItems = [...TICKER_ITEMS, ...TICKER_ITEMS, ...TICKER_ITEMS];
+  const allItems = [...items, ...items, ...items];
 
   useEffect(() => {
     const container = containerRef.current;
@@ -81,7 +93,7 @@ export function RunningTicker() {
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, []);
+  }, [allItems.length]);
 
   return (
     <div className="h-8 flex items-center overflow-hidden bg-[var(--bg-base)] border-b border-[var(--border)] shrink-0">
