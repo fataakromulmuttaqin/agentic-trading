@@ -44,6 +44,7 @@
   --gradient-hero: linear-gradient(135deg, #0A0A0F 0%, #111118 50%, #0A0A1A 100%);
   --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
   --gradient-orb: radial-gradient(ellipse at center, rgba(0,240,255,0.06) 0%, transparent 70%);
+  --gradient-sidebar: linear-gradient(180deg, var(--bg-base) 0%, rgba(10,10,15,0.95) 100%);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -86,6 +87,7 @@
   --gradient-hero: linear-gradient(135deg, #FFFFFF 0%, #F4F4F6 50%, #EEEEF2 100%);
   --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 100%);
   --gradient-orb: radial-gradient(ellipse at center, rgba(0,153,255,0.05) 0%, transparent 70%);
+  --gradient-sidebar: linear-gradient(180deg, var(--bg-base) 0%, rgba(255,255,255,0.95) 100%);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -104,7 +106,7 @@ body {
   height: 100%;
   overflow: auto;
   overscroll-behavior: none;
-  background: var(--bg-base);
+  background: var(--bg-void);
   font-family: var(--font-sans);
   color: var(--text-primary);
   -moz-osx-font-smoothing: grayscale;
@@ -196,16 +198,22 @@ input[type='number'] { -moz-appearance: textfield; }
   90% { opacity: 0.4; }
   100% { transform: translateY(-80px) translateX(20px); opacity: 0; }
 }
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 .animate-fade-in { animation: fadeIn 0.25s ease-out; }
 .animate-slide-up { animation: slideUp 0.35s cubic-bezier(0.22,1,0.36,1); }
 .animate-slide-down { animation: slideDown 0.25s ease-out; }
+.animate-slide-right { animation: slideRight 0.3s cubic-bezier(0.22,1,0.36,1); }
 .animate-scale-in { animation: scaleIn 0.2s cubic-bezier(0.22,1,0.36,1); }
 .animate-pulse-dot { animation: pulseDot 2s ease-in-out infinite; }
 .animate-glow-pulse { animation: glowPulse 3s ease-in-out infinite; }
 .animate-live-pulse { animation: livePulse 2s ease-in-out infinite; }
 .animate-spin { animation: spin 1s linear infinite; }
 .animate-float { animation: float 3s ease-in-out infinite; }
+.animate-page-enter { animation: pageEnter 0.3s cubic-bezier(0.22,1,0.36,1); }
 
 .skeleton {
   background: linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-elevated) 50%, var(--bg-surface) 75%);
@@ -263,4 +271,6 @@ a, button, input, select, textarea {
   .glow-lime { box-shadow: 0 0 16px var(--accent-lime-glow); }
   .glow-purple { box-shadow: 0 0 16px var(--accent-purple-glow); }
   .border-glow { border-color: var(--border-active); }
+  .bg-orb { background: var(--gradient-orb); }
+  .bg-sidebar { background: var(--gradient-sidebar); }
 }
