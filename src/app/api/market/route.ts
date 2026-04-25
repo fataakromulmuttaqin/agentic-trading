@@ -81,7 +81,8 @@ function setCached<T>(key: string, data: T): void {
   cache.set(key, { data, timestamp: Date.now() });
 }
 
-// ─── Price Fetcher (batched) ───────────────────────────────────────────────────
+// ─── Price Fetcher (batched using simple price endpoint) ──────────────────────
+// pricemultifull may be geo-blocked on Vercel, fall back to individual price calls
 
 async function fetchPricesBatch(symbols: string[]): Promise<Record<string, {
   price: number;
@@ -91,52 +92,52 @@ async function fetchPricesBatch(symbols: string[]): Promise<Record<string, {
   low24h: number;
   volume24h: number;
 }>> {
-  const fsyms = symbols.map(s => SUPPORTED_SYMBOLS[s]?.fsym).filter(Boolean).join(',');
-  if (!fsyms) return {};
+  const result: Record<string, {
+    price: number;
+    change24h: number;
+    changePct24h: number;
+    high24h: number;
+    low24h: number;
+    volume24h: number;
+  }> = {};
 
-  const url = `https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${fsyms}&tsyms=USDT`;
-
-  try {
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    
-    recordCall();
-    const json = await res.json();
-    const raw = json.RAW || {};
-
-    const result: Record<string, {
-      price: number;
-      change24h: number;
-      changePct24h: number;
-      high24h: number;
-      low24h: number;
-      volume24h: number;
-    }> = {};
-
-    for (const [sym, usdData] of Object.entries(raw) as [string, Record<string, unknown>][]) {
-      const d = usdData as Record<string, number>;
-      const pairKey = Object.entries(SUPPORTED_SYMBOLS).find(([, v]) => v.fsym === sym)?.[0];
-      if (!pairKey) continue;
-
-      result[pairKey] = {
-        price: d.PRICE || 0,
-        change24h: d.CHANGE24HOUR || 0,
-        changePct24h: d.CHANGEPCT24HOUR || 0,
-        high24h: d.HIGH24HOUR || 0,
-        low24h: d.LOW24HOUR || 0,
-        volume24h: d.TOPTIERVOLUME24HOUR || 0,
-      };
-    }
-
+  if (!canMakeCall()) {
     return result;
-  } catch (error) {
-    console.error('Price fetch error:', error);
-    return {};
   }
+
+  // Fetch individual prices (simpler endpoint, less likely blocked)
+  const pricePromises = symbols.slice(0, 10).map(async (sym) => {
+    const coin = SUPPORTED_SYMBOLS[sym];
+    if (!coin) return null;
+
+    try {
+      const url = `https://min-api.cryptocompare.com/data/price?fsym=${coin.fsym}&tsyms=USDT`;
+      const res = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      recordCall();
+
+      if (!res.ok) return null;
+      const data = await res.json();
+      const price = data.USDT;
+
+      if (typeof price !== 'number') return null;
+
+      return { sym, price, change24h: 0, changePct24h: 0, high24h: price, low24h: price, volume24h: 0 };
+    } catch {
+      return null;
+    }
+  });
+
+  const prices = await Promise.all(pricePromises);
+
+  for (const item of prices) {
+    if (item) result[item.sym] = item;
+  }
+
+  return result;
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
