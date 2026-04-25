@@ -15,6 +15,9 @@ import {
 } from 'lucide-react';
 import { TopNav } from '@/components/layout/TopNav';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { RunningTicker } from '@/components/layout/RunningTicker';
+import { CommandBar } from '@/components/layout/CommandBar';
+import { LiveDecisionFeed } from '@/components/layout/LiveDecisionFeed';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { DashboardHomePage } from '@/components/pages/DashboardHomePage';
@@ -86,6 +89,9 @@ export default function DashboardPage() {
 
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-void)] overflow-hidden">
+
+      {/* ─── Running Ticker ─── */}
+      <RunningTicker />
 
       {/* ─── Top Navigation ─── */}
       <TopNav />
@@ -254,6 +260,12 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {/* ─── Command Bar (CMD+K) ─── */}
+      <CommandBar onNavigate={setActiveId} />
+
+      {/* ─── Live Decision Feed ─── */}
+      <LiveDecisionFeed />
     </div>
   );
 }
