@@ -134,7 +134,7 @@ async function fetchPricesBatch(symbols: string[]): Promise<Record<string, {
   const prices = await Promise.all(pricePromises);
 
   for (const item of prices) {
-    if (item) result[item.sym] = item;
+    if (item) result[item.sym] = { price: item.price, change24h: item.change24h, changePct24h: item.changePct24h, high24h: item.high24h, low24h: item.low24h, volume24h: item.volume24h };
   }
 
   return result;
