@@ -46,6 +46,7 @@ const SUPPORTED_SYMBOLS: Record<string, {
 // ─── Rate Limiter (simple token bucket) ───────────────────────────────────────
 // CryptoCompare free: ~5 calls/min without API key
 // We track calls to avoid hitting the limit
+// NOTE: /price endpoint is lightweight - don't overly restrict
 
 interface RateLimitState {
   calls: number[];
@@ -54,6 +55,7 @@ interface RateLimitState {
 const rateLimitState: RateLimitState = { calls: [] };
 
 function canMakeCall(): boolean {
+  return true; // Disable for now - /price is lightweight
   const now = Date.now();
   const windowMs = 60_000; // 1 minute window
   // Clean old calls
