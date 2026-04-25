@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface OrderBookEntry {
@@ -28,6 +29,7 @@ function generateEntries(base: number, direction: 'bid' | 'ask', count = 12): Or
 const BASE_PRICE = 68372.45;
 
 export function OrderBook() {
+  const [minimized, setMinimized] = useState(false);
   const [bids, setBids] = useState(() => generateEntries(BASE_PRICE, 'bid'));
   const [asks, setAsks] = useState(() => generateEntries(BASE_PRICE, 'ask'));
   const [spread, setSpread] = useState('0.50');
@@ -66,62 +68,83 @@ export function OrderBook() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
-        <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Order Book</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Order Book</h3>
+          <button
+            onClick={() => setMinimized(!minimized)}
+            className="lg:hidden w-6 h-6 rounded-md flex items-center justify-center bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all text-[var(--text-muted)]"
+            aria-label={minimized ? 'Expand order book' : 'Minimize order book'}
+          >
+            {minimized ? <Plus className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+          </button>
+        </div>
         <div className="flex items-center gap-2 text-[10px]">
           <span className="text-[var(--text-muted)]">Spread</span>
           <span className="font-mono font-bold text-[var(--accent)]">{spread}</span>
         </div>
       </div>
 
-      {/* Column headers */}
-      <div className="grid grid-cols-3 px-4 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] shrink-0">
-        <span>Price</span>
-        <span className="text-right">Size</span>
-        <span className="text-right">Total</span>
-      </div>
-
-      {/* Asks — reversed so lowest ask at bottom */}
-      <div className="flex-1 overflow-y-auto flex flex-col-reverse">
-        {[...asks].reverse().map((ask, i) => {
-          const depthPct = Math.min((ask.total / maxTotal) * 100, 100);
-          return (
-            <div key={`ask-${i}`} className="relative grid grid-cols-3 px-4 py-[3px] text-[11px] font-mono group hover:bg-[var(--bg-elevated)]/50 transition-colors cursor-pointer">
-              <div
-                className="absolute inset-y-0 right-0 bg-[var(--negative)]/8 pointer-events-none"
-                style={{ width: `${depthPct}%` }}
-              />
-              <span className="text-[var(--negative)] relative z-10 font-medium">{ask.price}</span>
-              <span className="text-[var(--text-secondary)] text-right relative z-10">{ask.size}</span>
-              <span className="text-[var(--text-muted)] text-right relative z-10">{ask.total.toFixed(0)}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Mid price */}
-      <div className="px-4 py-2.5 bg-[var(--bg-elevated)] border-y border-[var(--border)] shrink-0">
-        <div className="flex items-center justify-center gap-3">
-          <span className="text-base font-black font-mono text-[var(--accent)]">{BASE_PRICE.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+      {/* Minimized state — thin strip only */}
+      {minimized && (
+        <div className="flex-1 flex items-center justify-center">
+          <span className="text-[10px] text-[var(--text-muted)] italic">Order Book · tap + to expand</span>
         </div>
-      </div>
+      )}
 
-      {/* Bids */}
-      <div className="flex-1 overflow-y-auto">
-        {bids.map((bid, i) => {
-          const depthPct = Math.min((bid.total / maxTotal) * 100, 100);
-          return (
-            <div key={`bid-${i}`} className="relative grid grid-cols-3 px-4 py-[3px] text-[11px] font-mono group hover:bg-[var(--bg-elevated)]/50 transition-colors cursor-pointer">
-              <div
-                className="absolute inset-y-0 right-0 bg-[var(--positive)]/8 pointer-events-none"
-                style={{ width: `${depthPct}%` }}
-              />
-              <span className="text-[var(--positive)] relative z-10 font-medium">{bid.price}</span>
-              <span className="text-[var(--text-secondary)] text-right relative z-10">{bid.size}</span>
-              <span className="text-[var(--text-muted)] text-right relative z-10">{bid.total.toFixed(0)}</span>
+      {/* Normal state */}
+      {!minimized && (
+        <>
+          {/* Column headers */}
+          <div className="grid grid-cols-3 px-4 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] shrink-0">
+            <span>Price</span>
+            <span className="text-right">Size</span>
+            <span className="text-right">Total</span>
+          </div>
+
+          {/* Asks — reversed so lowest ask at bottom */}
+          <div className="flex-1 overflow-y-auto flex flex-col-reverse">
+            {[...asks].reverse().map((ask, i) => {
+              const depthPct = Math.min((ask.total / maxTotal) * 100, 100);
+              return (
+                <div key={`ask-${i}`} className="relative grid grid-cols-3 px-4 py-[3px] text-[11px] font-mono group hover:bg-[var(--bg-elevated)]/50 transition-colors cursor-pointer">
+                  <div
+                    className="absolute inset-y-0 right-0 bg-[var(--negative)]/8 pointer-events-none"
+                    style={{ width: `${depthPct}%` }}
+                  />
+                  <span className="text-[var(--negative)] relative z-10 font-medium">{ask.price}</span>
+                  <span className="text-[var(--text-secondary)] text-right relative z-10">{ask.size}</span>
+                  <span className="text-[var(--text-muted)] text-right relative z-10">{ask.total.toFixed(0)}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Mid price */}
+          <div className="px-4 py-2.5 bg-[var(--bg-elevated)] border-y border-[var(--border)] shrink-0">
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-base font-black font-mono text-[var(--accent)]">{BASE_PRICE.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
-          );
-        })}
-      </div>
+          </div>
+
+          {/* Bids */}
+          <div className="flex-1 overflow-y-auto">
+            {bids.map((bid, i) => {
+              const depthPct = Math.min((bid.total / maxTotal) * 100, 100);
+              return (
+                <div key={`bid-${i}`} className="relative grid grid-cols-3 px-4 py-[3px] text-[11px] font-mono group hover:bg-[var(--bg-elevated)]/50 transition-colors cursor-pointer">
+                  <div
+                    className="absolute inset-y-0 right-0 bg-[var(--positive)]/8 pointer-events-none"
+                    style={{ width: `${depthPct}%` }}
+                  />
+                  <span className="text-[var(--positive)] relative z-10 font-medium">{bid.price}</span>
+                  <span className="text-[var(--text-secondary)] text-right relative z-10">{bid.size}</span>
+                  <span className="text-[var(--text-muted)] text-right relative z-10">{bid.total.toFixed(0)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
