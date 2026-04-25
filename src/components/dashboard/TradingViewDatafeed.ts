@@ -10,7 +10,7 @@
  * Docs: https://www.tradingview.com/charting-library-docs/latest/tutorials/implement_datafeed_tutorial/
  */
 
-import { IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,13 +50,6 @@ interface SymbolInfo {
 
 // ─── Resolution Mapping ────────────────────────────────────────────────────────
 // lightweight-charts uses TradingView-style resolution strings
-const RESOLUTION_MAP: Record<string, string> = {
-  '1': '1m', '5': '5m', '15': '15m', '30': '30m',
-  '60': '1h', '240': '4h', '1D': '1d', '1W': '1w',
-  '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
-  '1H': '1h', '4H': '4h', '1D': '1d', '1W': '1w',
-};
-
 const BINANCE_INTERVAL_MAP: Record<string, string> = {
   '1': '1m', '5': '5m', '15': '15m', '30': '30m',
   '60': '1h', '240': '4h', '1D': '1d', '1W': '1w',
