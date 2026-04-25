@@ -17,7 +17,6 @@ function generateCandleData(basePrice: number, count: number, trend: number): Ca
     const time = (now - i * 60) as Time;
     const volatility = basePrice * 0.004;
     const open = price;
-    // Bullish bias with occasional pullbacks
     const trendFactor = (Math.random() * 0.6 + 0.1) * trend;
     const change = (Math.random() - 0.45 + trendFactor) * volatility;
     const close = open + change;
@@ -39,106 +38,128 @@ export function ChartArea() {
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
-    const textColor = getComputedStyle(document.documentElement)
-      .getPropertyValue('--text-muted').trim() || '#52525B';
-    const gridColor = 'rgba(255,255,255,0.03)';
+    let rafId: number;
+    let cleanupFn: (() => void) | null = null;
+    let mounted = true;
 
-    chartRef.current = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight,
-      layout: {
-        background: { color: 'transparent' },
-        textColor: textColor,
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 11,
-      },
-      grid: {
-        vertLines: { color: gridColor },
-        horzLines: { color: gridColor },
-      },
-      crosshair: {
-        mode: 1,
-        vertLine: { color: 'rgba(0,240,255,0.25)', width: 1, style: 2, labelBackgroundColor: '#18181F' },
-        horzLine: { color: 'rgba(0,240,255,0.25)', width: 1, style: 2, labelBackgroundColor: '#18181F' },
-      },
-      rightPriceScale: {
-        borderColor: 'rgba(255,255,255,0.06)',
-        scaleMargins: { top: 0.05, bottom: 0.2 },
-      },
-      timeScale: {
-        borderColor: 'rgba(255,255,255,0.06)',
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 5,
-        fixLeftEdge: true,
-        fixRightEdge: true,
-      },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true },
-      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
-    });
+    const initChart = () => {
+      if (!chartContainerRef.current || !mounted) return;
 
-    // Candlestick series
-    seriesRef.current = chartRef.current.addCandlestickSeries({
-      upColor: '#39FF14',
-      downColor: '#FF3B6B',
-      borderUpColor: '#39FF14',
-      borderDownColor: '#FF3B6B',
-      wickUpColor: 'rgba(57,255,20,0.5)',
-      wickDownColor: 'rgba(255,59,107,0.5)',
-    });
+      const container = chartContainerRef.current;
+      const textColor = getComputedStyle(document.documentElement)
+        .getPropertyValue('--text-muted').trim() || '#6B7280';
+      const gridColor = 'rgba(255,255,255,0.03)';
 
-    // Volume series
-    volumeSeriesRef.current = chartRef.current.addHistogramSeries({
-      color: 'rgba(0,240,255,0.15)',
-      priceFormat: { type: 'volume' },
-      priceScaleId: 'volume',
-    });
-    chartRef.current.priceScale('volume').applyOptions({
-      scaleMargins: { top: 0.85, bottom: 0 },
-    });
+      const width = container.clientWidth;
+      const height = container.clientHeight || 400;
 
-    // Load initial data
-    const basePrice = 68372;
-    const trend = 1; // bullish
-    const data = generateCandleData(basePrice, 120, trend);
-    seriesRef.current.setData(data);
-
-    // Volume data
-    const volumeData = data.map((c) => ({
-      time: c.time,
-      value: Math.random() * 500 + 100,
-      color: c.close >= c.open ? 'rgba(57,255,20,0.3)' : 'rgba(255,59,107,0.3)',
-    }));
-    volumeSeriesRef.current.setData(volumeData);
-
-    chartRef.current.timeScale().fitContent();
-
-    // Resize observer
-    const resizeObserver = new ResizeObserver(() => {
-      if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight,
-        });
+      if (width === 0 || height === 0) {
+        rafId = requestAnimationFrame(initChart);
+        return;
       }
-    });
-    resizeObserver.observe(chartContainerRef.current);
+
+      const chart = createChart(container, {
+        width,
+        height,
+        layout: {
+          background: { color: 'transparent' },
+          textColor,
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: 11,
+        },
+        grid: {
+          vertLines: { color: gridColor },
+          horzLines: { color: gridColor },
+        },
+        crosshair: {
+          mode: 1,
+          vertLine: { color: 'rgba(0,240,255,0.25)', width: 1, style: 2, labelBackgroundColor: '#18181F' },
+          horzLine: { color: 'rgba(0,240,255,0.25)', width: 1, style: 2, labelBackgroundColor: '#18181F' },
+        },
+        rightPriceScale: {
+          borderColor: 'rgba(255,255,255,0.06)',
+          scaleMargins: { top: 0.05, bottom: 0.2 },
+        },
+        timeScale: {
+          borderColor: 'rgba(255,255,255,0.06)',
+          timeVisible: true,
+          secondsVisible: false,
+          rightOffset: 5,
+          fixLeftEdge: true,
+          fixRightEdge: true,
+        },
+        handleScroll: { mouseWheel: true, pressedMouseMove: true },
+        handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+      });
+
+      chartRef.current = chart;
+
+      const candlestickSeries = chart.addCandlestickSeries({
+        upColor: '#39FF14',
+        downColor: '#FF3B6B',
+        borderUpColor: '#39FF14',
+        borderDownColor: '#FF3B6B',
+        wickUpColor: 'rgba(57,255,20,0.5)',
+        wickDownColor: 'rgba(255,59,107,0.5)',
+      });
+      seriesRef.current = candlestickSeries;
+
+      const volumeSeries = chart.addHistogramSeries({
+        color: 'rgba(0,240,255,0.15)',
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume',
+      });
+      volumeSeriesRef.current = volumeSeries;
+      chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
+
+      const basePrice = 68372;
+      const trend = 1;
+      const data = generateCandleData(basePrice, 120, trend);
+      candlestickSeries.setData(data);
+
+      const volumeData = data.map((c) => ({
+        time: c.time,
+        value: Math.random() * 500 + 100,
+        color: c.close >= c.open ? 'rgba(57,255,20,0.3)' : 'rgba(255,59,107,0.3)',
+      }));
+      volumeSeries.setData(volumeData);
+      chart.timeScale().fitContent();
+
+      const resizeObserver = new ResizeObserver(() => {
+        if (chart && container) {
+          chart.applyOptions({
+            width: container.clientWidth,
+            height: container.clientHeight,
+          });
+        }
+      });
+      resizeObserver.observe(container);
+
+      cleanupFn = () => {
+        mounted = false;
+        resizeObserver.disconnect();
+        chart.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+        volumeSeriesRef.current = null;
+      };
+    };
+
+    rafId = requestAnimationFrame(initChart);
 
     return () => {
-      resizeObserver.disconnect();
-      chartRef.current?.remove();
-      chartRef.current = null;
-      seriesRef.current = null;
-      volumeSeriesRef.current = null;
+      mounted = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      if (cleanupFn) cleanupFn();
     };
   }, []);
 
   // Handle theme changes
   useEffect(() => {
     const observer = new MutationObserver(() => {
-      if (!chartRef.current || !seriesRef.current) return;
+      if (!chartRef.current) return;
       const textColor = getComputedStyle(document.documentElement)
-        .getPropertyValue('--text-muted').trim() || '#52525B';
+        .getPropertyValue('--text-muted').trim() || '#6B7280';
       chartRef.current.applyOptions({ layout: { textColor } });
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -147,16 +168,15 @@ export function ChartArea() {
 
   return (
     <div className="h-full flex flex-col relative">
-      {/* Chart Header Bar */}
+      {/* Header Bar */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-surface)]/50 shrink-0">
-        {/* Interval pills */}
         <div className="flex items-center gap-1">
           {INTERVALS.map((int) => (
             <button
               key={int}
               onClick={() => setInterval(int)}
               className={cn(
-                'px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150',
+                'px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors',
                 interval === int
                   ? 'bg-[var(--accent)] text-[var(--bg-void)] font-bold shadow-[0_0_12px_var(--accent-glow)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]'
@@ -166,8 +186,6 @@ export function ChartArea() {
             </button>
           ))}
         </div>
-
-        {/* Right controls */}
         <div className="flex items-center gap-1">
           <button className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors">
             <TrendingUp className="w-4 h-4" />
@@ -181,7 +199,7 @@ export function ChartArea() {
         </div>
       </div>
 
-      {/* Price Label Overlay */}
+      {/* Price Label */}
       <div className="absolute top-14 left-4 z-10 pointer-events-none">
         <div className="text-3xl font-black font-mono text-[var(--text-primary)] tracking-tight leading-none">
           68,372.45
@@ -198,7 +216,7 @@ export function ChartArea() {
         <span className="text-[10px] font-black text-[var(--accent-rose)] tracking-widest uppercase">Live</span>
       </div>
 
-      {/* Neural particle background */}
+      {/* Background glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
           className="absolute w-96 h-96 rounded-full opacity-[0.04]"
@@ -209,19 +227,10 @@ export function ChartArea() {
             filter: 'blur(40px)',
           }}
         />
-        <div
-          className="absolute w-64 h-64 rounded-full opacity-[0.03]"
-          style={{
-            background: 'radial-gradient(circle, var(--accent-purple) 0%, transparent 70%)',
-            bottom: '20%',
-            right: '20%',
-            filter: 'blur(40px)',
-          }}
-        />
       </div>
 
-      {/* Chart */}
-      <div ref={chartContainerRef} className="flex-1 min-h-0 relative z-[1]" />
+      {/* Chart container — MUST have a defined height */}
+      <div ref={chartContainerRef} className="flex-1 min-h-0 relative z-[1] overflow-hidden" />
     </div>
   );
 }

@@ -1,34 +1,33 @@
 'use client';
 
-import { ChartArea } from '@/components/dashboard/ChartArea';
-import { RightPanel } from '@/components/layout/RightPanel';
-import { AIPanel } from '@/components/layout/AIPanel';
 import { useState } from 'react';
+import { ChartArea } from '@/components/dashboard/ChartArea';
+import { OrderBook } from '@/components/dashboard/OrderBook';
+import { AIPanel } from '@/components/layout/AIPanel';
 
 export function DashboardHomePage() {
   const [aiPanelCollapsed, setAiPanelCollapsed] = useState(false);
 
   return (
-    <>
-      <div className="flex-1 flex overflow-hidden">
-        {/* Chart — main area */}
-        <div className="flex-1 flex flex-col overflow-hidden border-r border-[var(--border)]">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <ChartArea />
-          </div>
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      {/* Main grid: chart + orderbook */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Chart — takes most space */}
+        <div className="flex-1 min-h-0 overflow-hidden border-r border-[var(--border)]">
+          <ChartArea />
         </div>
 
-        {/* Right Panel */}
-        <div className="w-80 xl:w-96 shrink-0 overflow-hidden mobile-hidden">
-          <RightPanel />
+        {/* OrderBook sidebar */}
+        <div className="w-72 xl:w-80 shrink-0 overflow-hidden border-r border-[var(--border)]">
+          <OrderBook />
         </div>
       </div>
 
-      {/* AI Agent Control Panel */}
+      {/* AI Agent Panel — fixed height at bottom */}
       <AIPanel
         collapsed={aiPanelCollapsed}
         onToggle={() => setAiPanelCollapsed(!aiPanelCollapsed)}
       />
-    </>
+    </div>
   );
 }

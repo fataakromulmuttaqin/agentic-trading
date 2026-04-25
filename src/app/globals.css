@@ -102,13 +102,13 @@ html {
 
 body {
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
   overscroll-behavior: none;
   background: var(--bg-base);
+  font-family: var(--font-sans);
   color: var(--text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
@@ -215,13 +215,11 @@ input[type='number'] { -moz-appearance: textfield; }
 
 /* ═══════════════════════════════════════════════════
    THEME TRANSITION
+   Only transition colors — not layout properties
 ═══════════════════════════════════════════════════ */
-*, *::before, *::after {
-  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.3s ease;
+a, button, input, select, textarea {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
-
-/* Except for animations — don't transition animations */
-@keyframes *, .animate-* { transition: none; }
 
 /* ═══════════════════════════════════════════════════
    RESPONSIVE UTILITIES

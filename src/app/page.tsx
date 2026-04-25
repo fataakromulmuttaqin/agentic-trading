@@ -18,7 +18,7 @@ import { SettingsPage } from '@/components/pages/SettingsPage';
 const MOBILE_NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'markets', label: 'Markets', icon: LineChart },
-  { id: 'agentic', label: 'Agents', icon: Bot, active: true },
+  { id: 'agentic', label: 'Agents', icon: Bot },
 ];
 
 function renderPage(id: string) {
@@ -41,23 +41,24 @@ export default function DashboardPage() {
 
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-void)] overflow-hidden">
-      {/* Top Navigation */}
+      {/* Top Navigation — fixed height */}
       <TopNav />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden relative">
+      {/* Body: sidebar + content — takes remaining height */}
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+
         {/* Desktop Sidebar */}
         <Sidebar activeId={activeId} onSelect={setActiveId} />
 
-        {/* Main Area — responds to sidebar selection */}
-        <div className="hidden md:flex flex-1 flex-col overflow-hidden">
+        {/* Main content area — fills remaining space, proper overflow */}
+        <div className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden">
           {renderPage(activeId)}
         </div>
 
-        {/* ─── Mobile Layout (< 768px) ─── */}
-        <div className="flex-1 flex flex-col md:hidden overflow-hidden relative">
-          {/* Mobile nav tabs */}
-          <div className="flex items-center gap-1 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-base)] shrink-0">
+        {/* ─── Mobile Layout ─── */}
+        <div className="flex-1 flex flex-col md:hidden min-h-0 overflow-hidden relative">
+          {/* Mobile top bar */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border)] bg-[var(--bg-base)] shrink-0">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors"
@@ -88,35 +89,38 @@ export default function DashboardPage() {
                 );
               })}
             </div>
-            <ThemeToggle className="!w-8 !h-8" />
+            <ThemeToggle className="!w-8 !h-8 shrink-0" />
           </div>
 
-          {/* Page content */}
+          {/* Page content — scrolls if needed */}
           <div className="flex-1 min-h-0 overflow-hidden">
             {renderPage(activeId)}
           </div>
         </div>
 
-        {/* Mobile menu drawer */}
+        {/* Mobile drawer overlay */}
         {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobileMenuOpen(false)}>
+          <div
+            className="fixed inset-0 z-50 md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          >
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
             <div
-              className="absolute left-0 top-0 bottom-0 w-64 bg-[var(--bg-surface)] border-r border-[var(--border)] animate-slide-right"
+              className="absolute left-0 top-0 bottom-0 w-64 bg-[var(--bg-surface)] border-r border-[var(--border)] animate-slide-right flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-4 border-b border-[var(--border)] flex items-center gap-3">
+              <div className="p-4 border-b border-[var(--border)] flex items-center gap-3 shrink-0">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-purple)] flex items-center justify-center font-black text-sm text-[var(--bg-void)]">
                   Δ
                 </div>
                 <span className="font-display text-sm text-[var(--text-primary)]">Δ-78</span>
               </div>
-              <nav className="p-3 space-y-1">
+              <nav className="flex-1 overflow-y-auto p-3 space-y-1">
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                   { id: 'markets', label: 'Markets', icon: LineChart },
                   { id: 'portfolio', label: 'Portfolio', icon: Bot },
-                  { id: 'agentic', label: 'Agentic AI', icon: Bot, active: true },
+                  { id: 'agentic', label: 'Agentic AI', icon: Bot },
                   { id: 'trade', label: 'Trade', icon: Bot },
                   { id: 'analytics', label: 'Analytics', icon: Bot },
                   { id: 'signals', label: 'Signals', icon: Bot },
