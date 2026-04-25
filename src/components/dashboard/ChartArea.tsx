@@ -231,6 +231,11 @@ export function ChartArea() {
 
       {/* Chart container — MUST have a defined height */}
       <div ref={chartContainerRef} className="flex-1 min-h-0 relative z-[1] overflow-hidden" />
+
+      {/* TradingView branding */}
+      <div className="absolute bottom-2 right-4 z-10 flex items-center gap-1.5 pointer-events-none">
+        <span className="text-[9px] font-medium text-[var(--text-muted)] opacity-50">lightweight-charts</span>
+      </div>
     </div>
   );
 }
