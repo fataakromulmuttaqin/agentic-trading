@@ -1,30 +1,39 @@
 'use client';
 
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, Star, Search } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star, Search, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const MARKETS = [
-  { symbol: 'BTC/USD', price: '68,372.45', change: '+5.24%', positive: true, vol: '24.8B', marketCap: '1.34T' },
-  { symbol: 'ETH/USD', price: '3,521.80', change: '+2.15%', positive: true, vol: '12.3B', marketCap: '423B' },
-  { symbol: 'SOL/USD', price: '182.45', change: '-0.83%', positive: false, vol: '3.1B', marketCap: '82B' },
-  { symbol: 'XRP/USD', price: '0.5842', change: '+0.42%', positive: true, vol: '1.8B', marketCap: '32B' },
-  { symbol: 'ADA/USD', price: '0.4521', change: '-1.12%', positive: false, vol: '890M', marketCap: '16B' },
-  { symbol: 'DOGE/USD', price: '0.1523', change: '+3.21%', positive: true, vol: '1.2B', marketCap: '22B' },
-  { symbol: 'AVAX/USD', price: '38.72', change: '+1.87%', positive: true, vol: '620M', marketCap: '14B' },
-  { symbol: 'DOT/USD', price: '7.34', change: '-0.54%', positive: false, vol: '410M', marketCap: '9.8B' },
-  { symbol: 'LINK/USD', price: '14.82', change: '+4.12%', positive: true, vol: '380M', marketCap: '8.7B' },
-  { symbol: 'MATIC/USD', price: '0.7124', change: '+1.54%', positive: true, vol: '290M', marketCap: '6.6B' },
-  { symbol: 'UNI/USD', price: '9.84', change: '-2.31%', positive: false, vol: '180M', marketCap: '5.9B' },
-  { symbol: 'ATOM/USD', price: '8.92', change: '+0.87%', positive: true, vol: '145M', marketCap: '3.4B' },
-];
+import { useTrendingCoins } from '@/hooks/useTrendingCoins';
 
 const CATEGORIES = ['All', 'Crypto', 'DeFi', 'Layer 1', 'Layer 2', 'Meme'];
+
+function formatPrice(price: number): string {
+  if (!price || price === 0) return '—';
+  if (price >= 1000) return '$' + price.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (price >= 1) return '$' + price.toFixed(4);
+  return '$' + price.toFixed(6);
+}
+
+function formatVolume(v: number): string {
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+  return '$' + v.toFixed(0);
+}
+
+function formatMarketCap(v: number): string {
+  if (v >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T';
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+  return '$' + v.toLocaleString();
+}
 
 export function MarketsPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(['BTC/USD', 'ETH/USD']));
+  const [favorites, setFavorites] = useState<Set<string>>(new Set(['BTC', 'ETH']));
+
+  const { coins, loading, error, lastUpdate, refresh } = useTrendingCoins();
 
   const toggleFavorite = (symbol: string) => {
     setFavorites((prev) => {
@@ -35,21 +44,45 @@ export function MarketsPage() {
     });
   };
 
-  const filtered = MARKETS.filter((m) => {
-    const matchSearch = m.symbol.toLowerCase().includes(search.toLowerCase());
+  const filtered = coins.filter((m) => {
+    const matchSearch =
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
+      m.symbol.toLowerCase().includes(search.toLowerCase());
     return matchSearch;
   });
 
   return (
     <div className="h-full overflow-y-auto p-6">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-black text-[var(--text-primary)]">Markets</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">Real-time market data across all pairs</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">
+            {lastUpdate
+              ? `Live data · Updated ${lastUpdate.toLocaleTimeString()}`
+              : 'Connecting to CoinGecko...'}
+          </p>
         </div>
-        <div className="flex items-center gap-2 text-xs font-mono text-[var(--text-muted)]">
-          <div className="w-2 h-2 rounded-full bg-[var(--positive)] animate-pulse" />
-          <span>Live Prices</span>
+        <div className="flex items-center gap-3">
+          {error && (
+            <span className="text-xs text-[var(--negative)]">⚠ {error}</span>
+          )}
+          <div className="flex items-center gap-2 text-xs font-mono text-[var(--text-muted)]">
+            <div
+              className={cn(
+                'w-2 h-2 rounded-full animate-pulse',
+                loading ? 'bg-yellow-400' : 'bg-[var(--positive)]'
+              )}
+            />
+            <span>{loading ? 'Loading...' : 'Live'}</span>
+          </div>
+          <button
+            onClick={refresh}
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className={cn('w-3.5 h-3.5 text-[var(--text-muted)]', loading && 'animate-spin')} />
+          </button>
         </div>
       </div>
 
@@ -60,7 +93,7 @@ export function MarketsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search markets..."
+            placeholder="Search coins..."
             className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--border-active)]"
           />
         </div>
@@ -84,55 +117,104 @@ export function MarketsPage() {
 
       {/* Table */}
       <div className="rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] overflow-hidden">
-        <div className="grid grid-cols-6 px-4 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]">
-          <span>Pair</span>
+        <div className="grid grid-cols-7 px-4 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)]">
+          <span>#</span>
+          <span>Coin</span>
           <span>Price</span>
           <span>24h Change</span>
           <span className="text-right">Volume</span>
           <span className="text-right">Market Cap</span>
           <span className="text-right">Actions</span>
         </div>
-        {filtered.map((market, i) => (
-          <div
-            key={market.symbol}
-            className={cn(
-              'grid grid-cols-6 px-4 py-3.5 items-center hover:bg-[var(--bg-glass)] transition-colors cursor-pointer',
-              i !== filtered.length - 1 && 'border-b border-[var(--border)]'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => toggleFavorite(market.symbol)}
-                className="focus:outline-none"
-              >
-                <Star
-                  className={cn('w-4 h-4', favorites.has(market.symbol) ? 'fill-[var(--accent)] text-[var(--accent)]' : 'text-[var(--text-muted)]')}
-                />
-              </button>
-              <div>
-                <div className="text-sm font-bold text-[var(--text-primary)]">{market.symbol}</div>
-              </div>
-            </div>
-            <span className="text-sm font-mono font-medium text-[var(--text-primary)]">{market.price}</span>
-            <div className="flex items-center gap-1">
-              {market.positive ? (
-                <TrendingUp className="w-3.5 h-3.5 text-[var(--positive)]" />
-              ) : (
-                <TrendingDown className="w-3.5 h-3.5 text-[var(--negative)]" />
-              )}
-              <span className={cn('text-sm font-bold font-mono', market.positive ? 'text-[var(--positive)]' : 'text-[var(--negative)]')}>
-                {market.change}
-              </span>
-            </div>
-            <span className="text-sm font-mono text-[var(--text-secondary)] text-right">{market.vol}</span>
-            <span className="text-sm font-mono text-[var(--text-secondary)] text-right">${market.marketCap}</span>
-            <div className="flex items-center justify-end gap-2">
-              <button className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 hover:bg-[var(--accent)]/20 transition-colors">
-                Trade
-              </button>
-            </div>
+
+        {loading && filtered.length === 0 ? (
+          <div className="p-8 text-center text-sm text-[var(--text-muted)]">
+            Loading trending coins...
           </div>
-        ))}
+        ) : (
+          filtered.map((coin, i) => {
+            const isPositive = coin.priceChangePct24h >= 0;
+            return (
+              <div
+                key={coin.id}
+                className={cn(
+                  'grid grid-cols-7 px-4 py-3.5 items-center hover:bg-[var(--bg-glass)] transition-colors cursor-pointer',
+                  i !== filtered.length - 1 && 'border-b border-[var(--border)]'
+                )}
+              >
+                {/* Rank */}
+                <span className="text-xs text-[var(--text-muted)]">{coin.marketCapRank || '—'}</span>
+
+                {/* Coin */}
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => toggleFavorite(coin.symbol)}
+                    className="focus:outline-none"
+                  >
+                    <Star
+                      className={cn(
+                        'w-3.5 h-3.5',
+                        favorites.has(coin.symbol)
+                          ? 'fill-[var(--accent)] text-[var(--accent)]'
+                          : 'text-[var(--text-muted)]'
+                      )}
+                    />
+                  </button>
+                  <img
+                    src={coin.thumb}
+                    alt={coin.name}
+                    className="w-6 h-6 rounded-full"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <div>
+                    <div className="text-sm font-bold text-[var(--text-primary)]">{coin.name}</div>
+                    <div className="text-[10px] text-[var(--text-muted)] uppercase">{coin.symbol}</div>
+                  </div>
+                </div>
+
+                {/* Price */}
+                <span className="text-sm font-mono font-medium text-[var(--text-primary)]">
+                  {formatPrice(coin.priceUsd)}
+                </span>
+
+                {/* Change */}
+                <div className="flex items-center gap-1">
+                  {isPositive ? (
+                    <TrendingUp className="w-3.5 h-3.5 text-[var(--positive)]" />
+                  ) : (
+                    <TrendingDown className="w-3.5 h-3.5 text-[var(--negative)]" />
+                  )}
+                  <span
+                    className={cn(
+                      'text-sm font-bold font-mono',
+                      isPositive ? 'text-[var(--positive)]' : 'text-[var(--negative)]'
+                    )}
+                  >
+                    {isPositive ? '+' : ''}
+                    {coin.priceChangePct24h.toFixed(2)}%
+                  </span>
+                </div>
+
+                {/* Volume */}
+                <span className="text-sm font-mono text-[var(--text-secondary)] text-right">
+                  {formatVolume(coin.totalVolume)}
+                </span>
+
+                {/* Market Cap */}
+                <span className="text-sm font-mono text-[var(--text-secondary)] text-right">
+                  {formatMarketCap(coin.marketCap)}
+                </span>
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-2">
+                  <button className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 hover:bg-[var(--accent)]/20 transition-colors">
+                    Trade
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

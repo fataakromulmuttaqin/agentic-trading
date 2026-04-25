@@ -64,7 +64,8 @@ function canMakeCall(): boolean {
 }
 
 function recordCall(): void {
-  rateLimitState.calls.push(Date.now());
+  // Rate limiter disabled — /price endpoint is lightweight
+  // rateLimitState.calls.push(Date.now());
 }
 
 // ─── Cache helpers ─────────────────────────────────────────────────────────────
