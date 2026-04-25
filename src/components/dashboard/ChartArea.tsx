@@ -1,160 +1,332 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time } from 'lightweight-charts';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { createChart, IChartApi, ISeriesApi, Time, CandlestickData, HistogramData } from 'lightweight-charts';
 import { Maximize2, Volume2, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMarket } from '@/components/providers/MarketProvider';
 
-const INTERVALS = ['1m', '5m', '15m', '1H', '4H', '1D', '1W'] as const;
+const INTERVALS = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'] as const;
 type Interval = (typeof INTERVALS)[number];
 
-function generateCandleData(basePrice: number, count: number, trend: number): CandlestickData<Time>[] {
-  const data: CandlestickData<Time>[] = [];
-  let price = basePrice * (1 - trend * 0.05);
-  const now = Math.floor(Date.now() / 1000);
+// ─── Binance API helpers ──────────────────────────────────────────────────────
 
-  for (let i = count; i >= 0; i--) {
-    const time = (now - i * 60) as Time;
-    const volatility = basePrice * 0.004;
-    const open = price;
-    const trendFactor = (Math.random() * 0.6 + 0.1) * trend;
-    const change = (Math.random() - 0.45 + trendFactor) * volatility;
-    const close = open + change;
-    const high = Math.max(open, close) + Math.random() * volatility * 0.4;
-    const low = Math.min(open, close) - Math.random() * volatility * 0.4;
-    data.push({ time, open, high, low, close });
-    price = close;
-  }
-  return data;
+async function fetchHistoricalBars(
+  symbol: string,
+  interval: string,
+  limit = 300
+): Promise<CandlestickData<Time>[]> {
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+
+  return data.map((k: (string | number)[]) => ({
+    time: (Number(k[0]) / 1000) as Time,
+    open: parseFloat(k[1] as string),
+    high: parseFloat(k[2] as string),
+    low: parseFloat(k[3] as string),
+    close: parseFloat(k[4] as string),
+  }));
+}
+
+async function fetchVolumeData(
+  symbol: string,
+  interval: string,
+  limit = 300
+): Promise<HistogramData<Time>[]> {
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+
+  return data.map((k: (string | number)[]) => {
+    const close = parseFloat(k[4] as string);
+    const open = parseFloat(k[1] as string);
+    return {
+      time: (Number(k[0]) / 1000) as Time,
+      value: parseFloat(k[5] as string),
+      color: close >= open ? 'rgba(57,255,20,0.3)' : 'rgba(255,59,107,0.3)',
+    };
+  });
+}
+
+// ─── WebSocket for real-time kline updates ───────────────────────────────────
+// Binance WebSocket: wss://stream.binance.com:9443/stream?streams=<symbol>@kline_<interval>
+
+interface KlineMessage {
+  e: string;    // Event type
+  s: string;    // Symbol
+  k: {
+    t: number;  // Kline start time
+    o: string;  // Open
+    h: string;  // High
+    l: string;  // Low
+    c: string;  // Close
+    v: string;  // Base asset volume
+    x: boolean; // Is candle closed?
+  };
+}
+
+interface WsMessage {
+  stream: string;
+  data: KlineMessage;
 }
 
 export function ChartArea() {
+  const { tickers } = useMarket();
+  const [interval, setInterval] = useState<Interval>('15m');
+  const [symbol] = useState('BTCUSDT');
+  const [loading, setLoading] = useState(true);
+  const [lastPrice, setLastPrice] = useState<number | null>(null);
+  const [priceChange, setPriceChange] = useState<{ value: number; pct: number } | null>(null);
+
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
-  const [interval, setInterval] = useState<Interval>('15m');
+  const candlestickRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectAttemptsRef = useRef(0);
 
-  useEffect(() => {
+  // ─── Chart Initialization ───────────────────────────────────────────────────
+
+  const initChart = useCallback(() => {
     if (!chartContainerRef.current) return;
 
-    let rafId: number;
-    let cleanupFn: (() => void) | null = null;
-    let mounted = true;
+    const container = chartContainerRef.current;
+    const width = container.clientWidth;
+    const height = container.clientHeight || 400;
 
-    const initChart = () => {
-      if (!chartContainerRef.current || !mounted) return;
+    if (width === 0 || height === 0) return null;
 
-      const container = chartContainerRef.current;
-      const textColor = getComputedStyle(document.documentElement)
-        .getPropertyValue('--text-muted').trim() || '#6B7280';
-      const gridColor = 'rgba(255,255,255,0.03)';
+    const textColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--text-muted').trim() || '#6B7280';
 
-      const width = container.clientWidth;
-      const height = container.clientHeight || 400;
+    const chart = createChart(container, {
+      width,
+      height,
+      layout: {
+        background: { color: 'transparent' },
+        textColor,
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: 'rgba(255,255,255,0.03)' },
+        horzLines: { color: 'rgba(255,255,255,0.03)' },
+      },
+      crosshair: {
+        mode: 1,
+        vertLine: { color: 'rgba(0,240,255,0.25)', width: 1, style: 2, labelBackgroundColor: '#18181F' },
+        horzLine: { color: 'rgba(0,240,255,0.25)', width: 1, style: 2, labelBackgroundColor: '#18181F' },
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(255,255,255,0.06)',
+        scaleMargins: { top: 0.05, bottom: 0.2 },
+      },
+      timeScale: {
+        borderColor: 'rgba(255,255,255,0.06)',
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 5,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+      },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
+    });
 
-      if (width === 0 || height === 0) {
-        rafId = requestAnimationFrame(initChart);
-        return;
-      }
+    chartRef.current = chart;
 
-      const chart = createChart(container, {
-        width,
-        height,
-        layout: {
-          background: { color: 'transparent' },
-          textColor,
-          fontFamily: 'JetBrains Mono, monospace',
-          fontSize: 11,
-        },
-        grid: {
-          vertLines: { color: gridColor },
-          horzLines: { color: gridColor },
-        },
-        crosshair: {
-          mode: 1,
-          vertLine: { color: 'rgba(0,240,255,0.25)', width: 1, style: 2, labelBackgroundColor: '#18181F' },
-          horzLine: { color: 'rgba(0,240,255,0.25)', width: 1, style: 2, labelBackgroundColor: '#18181F' },
-        },
-        rightPriceScale: {
-          borderColor: 'rgba(255,255,255,0.06)',
-          scaleMargins: { top: 0.05, bottom: 0.2 },
-        },
-        timeScale: {
-          borderColor: 'rgba(255,255,255,0.06)',
-          timeVisible: true,
-          secondsVisible: false,
-          rightOffset: 5,
-          fixLeftEdge: true,
-          fixRightEdge: true,
-        },
-        handleScroll: { mouseWheel: true, pressedMouseMove: true },
-        handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
-      });
+    const candlestick = chart.addCandlestickSeries({
+      upColor: '#39FF14',
+      downColor: '#FF3B6B',
+      borderUpColor: '#39FF14',
+      borderDownColor: '#FF3B6B',
+      wickUpColor: 'rgba(57,255,20,0.5)',
+      wickDownColor: 'rgba(255,59,107,0.5)',
+    });
+    candlestickRef.current = candlestick;
 
-      chartRef.current = chart;
+    const volume = chart.addHistogramSeries({
+      color: 'rgba(0,240,255,0.15)',
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',
+    });
+    volumeRef.current = volume;
+    chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
 
-      const candlestickSeries = chart.addCandlestickSeries({
-        upColor: '#39FF14',
-        downColor: '#FF3B6B',
-        borderUpColor: '#39FF14',
-        borderDownColor: '#FF3B6B',
-        wickUpColor: 'rgba(57,255,20,0.5)',
-        wickDownColor: 'rgba(255,59,107,0.5)',
-      });
-      seriesRef.current = candlestickSeries;
-
-      const volumeSeries = chart.addHistogramSeries({
-        color: 'rgba(0,240,255,0.15)',
-        priceFormat: { type: 'volume' },
-        priceScaleId: 'volume',
-      });
-      volumeSeriesRef.current = volumeSeries;
-      chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
-
-      const basePrice = 68372;
-      const trend = 1;
-      const data = generateCandleData(basePrice, 120, trend);
-      candlestickSeries.setData(data);
-
-      const volumeData = data.map((c) => ({
-        time: c.time,
-        value: Math.random() * 500 + 100,
-        color: c.close >= c.open ? 'rgba(57,255,20,0.3)' : 'rgba(255,59,107,0.3)',
-      }));
-      volumeSeries.setData(volumeData);
-      chart.timeScale().fitContent();
-
-      const resizeObserver = new ResizeObserver(() => {
-        if (chart && container) {
-          chart.applyOptions({
-            width: container.clientWidth,
-            height: container.clientHeight,
-          });
-        }
-      });
-      resizeObserver.observe(container);
-
-      cleanupFn = () => {
-        mounted = false;
-        resizeObserver.disconnect();
-        chart.remove();
-        chartRef.current = null;
-        seriesRef.current = null;
-        volumeSeriesRef.current = null;
-      };
-    };
-
-    rafId = requestAnimationFrame(initChart);
-
-    return () => {
-      mounted = false;
-      if (rafId) cancelAnimationFrame(rafId);
-      if (cleanupFn) cleanupFn();
-    };
+    return chart;
   }, []);
 
-  // Handle theme changes
+  // ─── Load Historical Data ───────────────────────────────────────────────────
+
+  const loadData = useCallback(async () => {
+    if (!chartRef.current || !candlestickRef.current || !volumeRef.current) return;
+
+    setLoading(true);
+    try {
+      const [bars, volumes] = await Promise.all([
+        fetchHistoricalBars(symbol, interval),
+        fetchVolumeData(symbol, interval),
+      ]);
+
+      if (bars.length > 0) {
+        candlestickRef.current.setData(bars);
+        volumeRef.current.setData(volumes);
+        chartRef.current.timeScale().fitContent();
+
+        const lastBar = bars[bars.length - 1];
+        const firstBar = bars[0];
+        setLastPrice(lastBar.close);
+        setPriceChange({
+          value: lastBar.close - firstBar.open,
+          pct: ((lastBar.close - firstBar.open) / firstBar.open) * 100,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load chart data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [symbol, interval]);
+
+  // ─── Initial Setup ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const chart = initChart();
+    if (!chart) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (chart && chartContainerRef.current) {
+        chart.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight,
+        });
+      }
+    });
+    resizeObserver.observe(chartContainerRef.current!);
+
+    loadData();
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.remove();
+      chartRef.current = null;
+      candlestickRef.current = null;
+      volumeRef.current = null;
+    };
+  }, [initChart, loadData]);
+
+  // Reload when symbol or interval changes
+  useEffect(() => {
+    if (chartRef.current) {
+      loadData();
+    }
+  }, [symbol, interval, loadData]);
+
+  // ─── Real-time WebSocket ────────────────────────────────────────────────────
+  // subscribeBars pattern from TradingView UDF:
+  // https://www.tradingview.com/charting-library-docs/latest/tutorials/implement_datafeed_tutorial/Streaming-Implementation/
+
+  const connectKlineStream = useCallback(() => {
+    // Close existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    const wsUrl = `wss://stream.binance.com:9443/stream?streams=${symbol.toLowerCase()}@kline_${interval}`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      reconnectAttemptsRef.current = 0;
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg: WsMessage = JSON.parse(event.data);
+        const { k } = msg.data;
+
+        if (!k.x) {
+          // Candle NOT closed yet → update live candle
+          // This is real-time streaming via subscribeBars pattern
+          const liveBar: CandlestickData<Time> = {
+            time: (k.t / 1000) as Time,
+            open: parseFloat(k.o),
+            high: parseFloat(k.h),
+            low: parseFloat(k.l),
+            close: parseFloat(k.c),
+          };
+          candlestickRef.current?.update(liveBar);
+        } else {
+          // Candle just closed → add as new bar
+          const closedBar: CandlestickData<Time> = {
+            time: (k.t / 1000) as Time,
+            open: parseFloat(k.o),
+            high: parseFloat(k.h),
+            low: parseFloat(k.l),
+            close: parseFloat(k.c),
+          };
+          candlestickRef.current?.update(closedBar);
+        }
+
+        // Update price display from kline
+        const currentPrice = parseFloat(k.c);
+        if (!isNaN(currentPrice)) {
+          setLastPrice(currentPrice);
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    ws.onerror = () => {};
+
+    ws.onclose = () => {
+      // Exponential backoff reconnect — matching TradingView streaming pattern
+      const attempts = reconnectAttemptsRef.current;
+      if (attempts < 5) {
+        reconnectAttemptsRef.current++;
+        const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectKlineStream();
+        }, delay);
+      }
+    };
+  }, [symbol, interval]);
+
+  useEffect(() => {
+    connectKlineStream();
+    return () => {
+      clearTimeout(reconnectTimeoutRef.current);
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, [connectKlineStream]);
+
+  // ─── Update chart when symbol changes via MarketProvider ───────────────────
+
+  useEffect(() => {
+    const ticker = tickers[symbol];
+    if (ticker) {
+      setLastPrice(ticker.priceNum);
+      if (priceChange === null) {
+        setPriceChange({ value: 0, pct: ticker.changeNum });
+      }
+    }
+  }, [tickers, symbol, priceChange]);
+
+  // ─── Sync with selected pair from TopNav ──────────────────────────────────
+  // (This connects the chart to the same symbol selected in the header)
+
+  // Note: In a full implementation, you'd lift symbol state to page.tsx
+  // and pass it down via context. For now, chart defaults to BTCUSDT.
+
+  // ─── Theme Observer ─────────────────────────────────────────────────────────
+
   useEffect(() => {
     const observer = new MutationObserver(() => {
       if (!chartRef.current) return;
@@ -165,6 +337,19 @@ export function ChartArea() {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => observer.disconnect();
   }, []);
+
+  // ─── Format helpers ─────────────────────────────────────────────────────────
+
+  const formatPrice = (p: number | null) => {
+    if (p === null) return '—';
+    return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const formatChange = (v: number) => {
+    return (v >= 0 ? '+' : '') + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const positive = priceChange ? priceChange.pct >= 0 : true;
 
   return (
     <div className="h-full flex flex-col relative">
@@ -202,18 +387,34 @@ export function ChartArea() {
       {/* Price Label */}
       <div className="absolute top-14 left-4 z-10 pointer-events-none">
         <div className="text-3xl font-black font-mono text-[var(--text-primary)] tracking-tight leading-none">
-          68,372.45
+          {formatPrice(lastPrice)}
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-sm font-bold text-[var(--positive)]">+$3,422.15</span>
-          <span className="text-sm font-bold text-[var(--positive)]">+5.27%</span>
-        </div>
+        {priceChange && (
+          <div className="flex items-center gap-2 mt-1">
+            <span className={cn('text-sm font-bold', positive ? 'text-[var(--positive)]' : 'text-[var(--negative)]')}>
+              {formatChange(priceChange.value)}
+            </span>
+            <span className={cn('text-sm font-bold', positive ? 'text-[var(--positive)]' : 'text-[var(--negative)]')}>
+              ({positive ? '+' : ''}{priceChange.pct.toFixed(2)}%)
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* LIVE Badge */}
-      <div className="absolute top-14 right-4 z-10 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-glass)] border border-[var(--accent-rose)]/30 backdrop-blur-md">
-        <div className="live-dot" />
-        <span className="text-[10px] font-black text-[var(--accent-rose)] tracking-widest uppercase">Live</span>
+      {/* LIVE + Loading Badge */}
+      <div className="absolute top-14 right-4 z-10 pointer-events-none flex items-center gap-1.5">
+        {loading && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-glass)] border border-[var(--accent)]/30 backdrop-blur-md">
+            <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
+            <span className="text-[10px] font-black text-[var(--accent)] tracking-widest uppercase">Loading</span>
+          </div>
+        )}
+        {!loading && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--bg-glass)] border border-[var(--accent-rose)]/30 backdrop-blur-md">
+            <div className="live-dot" />
+            <span className="text-[10px] font-black text-[var(--accent-rose)] tracking-widest uppercase">Live</span>
+          </div>
+        )}
       </div>
 
       {/* Background glow */}
@@ -229,12 +430,12 @@ export function ChartArea() {
         />
       </div>
 
-      {/* Chart container — MUST have a defined height */}
+      {/* Chart container */}
       <div ref={chartContainerRef} className="flex-1 min-h-0 relative z-[1] overflow-hidden" />
 
-      {/* TradingView branding */}
+      {/* Branding */}
       <div className="absolute bottom-2 right-4 z-10 flex items-center gap-1.5 pointer-events-none">
-        <span className="text-[9px] font-medium text-[var(--text-muted)] opacity-50">lightweight-charts</span>
+        <span className="text-[9px] font-medium text-[var(--text-muted)] opacity-50">Binance + lightweight-charts</span>
       </div>
     </div>
   );
