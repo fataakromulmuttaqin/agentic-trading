@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Menu, X, Bot, LineChart, LayoutDashboard } from 'lucide-react';
+import { Menu, X, Bot, LineChart, LayoutDashboard, PieChart, TrendingUp, BarChart2, Bell, Settings, Activity } from 'lucide-react';
 import { TopNav } from '@/components/layout/TopNav';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -119,12 +119,12 @@ export default function DashboardPage() {
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                   { id: 'markets', label: 'Markets', icon: LineChart },
-                  { id: 'portfolio', label: 'Portfolio', icon: Bot },
-                  { id: 'agentic', label: 'Agentic AI', icon: Bot },
-                  { id: 'trade', label: 'Trade', icon: Bot },
-                  { id: 'analytics', label: 'Analytics', icon: Bot },
-                  { id: 'signals', label: 'Signals', icon: Bot },
-                  { id: 'settings', label: 'Settings', icon: Bot },
+                  { id: 'portfolio', label: 'Portfolio', icon: PieChart },
+                  { id: 'agentic', label: 'Agentic AI', icon: Activity },
+                  { id: 'trade', label: 'Trade', icon: TrendingUp },
+                  { id: 'analytics', label: 'Analytics', icon: BarChart2 },
+                  { id: 'signals', label: 'Signals', icon: Bell },
+                  { id: 'settings', label: 'Settings', icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
