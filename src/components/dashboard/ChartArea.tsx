@@ -16,17 +16,18 @@ async function fetchHistoricalBars(
   interval: string,
   limit = 300
 ): Promise<CandlestickData<Time>[]> {
-  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const url = `/api/binance/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
+  if (!Array.isArray(data)) throw new Error('Invalid data');
 
-  return data.map((k: (string | number)[]) => ({
-    time: (Number(k[0]) / 1000) as Time,
-    open: parseFloat(k[1] as string),
-    high: parseFloat(k[2] as string),
-    low: parseFloat(k[3] as string),
-    close: parseFloat(k[4] as string),
+  return data.map((k: { time: number; open: number; high: number; low: number; close: number }) => ({
+    time: k.time as Time,
+    open: k.open,
+    high: k.high,
+    low: k.low,
+    close: k.close,
   }));
 }
 
@@ -35,18 +36,17 @@ async function fetchVolumeData(
   interval: string,
   limit = 300
 ): Promise<HistogramData<Time>[]> {
-  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const url = `/api/binance/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
+  if (!Array.isArray(data)) throw new Error('Invalid data');
 
-  return data.map((k: (string | number)[]) => {
-    const close = parseFloat(k[4] as string);
-    const open = parseFloat(k[1] as string);
+  return data.map((k: { time: number; open: number; close: number; volume: number }) => {
     return {
-      time: (Number(k[0]) / 1000) as Time,
-      value: parseFloat(k[5] as string),
-      color: close >= open ? 'rgba(57,255,20,0.3)' : 'rgba(255,59,107,0.3)',
+      time: k.time as Time,
+      value: k.volume,
+      color: k.close >= k.open ? 'rgba(57,255,20,0.3)' : 'rgba(255,59,107,0.3)',
     };
   });
 }
