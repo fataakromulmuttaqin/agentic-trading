@@ -19,7 +19,7 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'markets', label: 'Markets', icon: LineChart },
   { id: 'portfolio', label: 'Portfolio', icon: Wallet },
-  { id: 'agentic', label: 'Agentic AI', icon: Bot, active: true, glow: 'var(--accent-purple)' },
+  { id: 'agentic', label: 'Agentic AI', icon: Bot, glow: 'var(--accent-purple)' },
   { id: 'trade', label: 'Trade', icon: Zap },
   { id: 'analytics', label: 'Analytics', icon: BarChart2 },
   { id: 'signals', label: 'Signals', icon: Radio, badge: 3 },
@@ -29,15 +29,19 @@ const NAV_ITEMS = [
 function NavItem({
   item,
   expanded,
+  isActive,
+  onClick,
 }: {
   item: (typeof NAV_ITEMS)[0];
   expanded: boolean;
+  isActive: boolean;
+  onClick: () => void;
 }) {
   const Icon = item.icon;
-  const isActive = item.active;
 
   return (
     <button
+      onClick={onClick}
       className={cn(
         'relative w-full flex items-center gap-3 rounded-xl transition-all duration-150 group',
         'hover:scale-[1.02] active:scale-[0.98]',
@@ -87,7 +91,7 @@ function NavItem({
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ activeId, onSelect }: { activeId: string; onSelect: (id: string) => void }) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -100,7 +104,13 @@ export function Sidebar() {
       {/* Nav items */}
       <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
         {NAV_ITEMS.map((item) => (
-          <NavItem key={item.id} item={item} expanded={expanded} />
+          <NavItem
+            key={item.id}
+            item={item}
+            expanded={expanded}
+            isActive={activeId === item.id}
+            onClick={() => onSelect(item.id)}
+          />
         ))}
       </nav>
 

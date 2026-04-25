@@ -4,22 +4,40 @@ import { useState } from 'react';
 import { Menu, X, Bot, LineChart, LayoutDashboard } from 'lucide-react';
 import { TopNav } from '@/components/layout/TopNav';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { RightPanel } from '@/components/layout/RightPanel';
-import { AIPanel } from '@/components/layout/AIPanel';
-import { ChartArea } from '@/components/dashboard/ChartArea';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
+import { DashboardHomePage } from '@/components/pages/DashboardHomePage';
+import { AgenticPage } from '@/components/pages/AgenticPage';
+import { MarketsPage } from '@/components/pages/MarketsPage';
+import { PortfolioPage } from '@/components/pages/PortfolioPage';
+import { TradePage } from '@/components/pages/TradePage';
+import { AnalyticsPage } from '@/components/pages/AnalyticsPage';
+import { SignalsPage } from '@/components/pages/SignalsPage';
+import { SettingsPage } from '@/components/pages/SettingsPage';
 
-// Mobile nav items
 const MOBILE_NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'markets', label: 'Markets', icon: LineChart },
   { id: 'agentic', label: 'Agents', icon: Bot, active: true },
 ];
 
+function renderPage(id: string) {
+  switch (id) {
+    case 'dashboard': return <DashboardHomePage />;
+    case 'agentic': return <AgenticPage />;
+    case 'markets': return <MarketsPage />;
+    case 'portfolio': return <PortfolioPage />;
+    case 'trade': return <TradePage />;
+    case 'analytics': return <AnalyticsPage />;
+    case 'signals': return <SignalsPage />;
+    case 'settings': return <SettingsPage />;
+    default: return <DashboardHomePage />;
+  }
+}
+
 export default function DashboardPage() {
+  const [activeId, setActiveId] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [aiPanelCollapsed, setAiPanelCollapsed] = useState(false);
 
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-void)] overflow-hidden">
@@ -29,30 +47,11 @@ export default function DashboardPage() {
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Desktop Sidebar */}
-        <Sidebar />
+        <Sidebar activeId={activeId} onSelect={setActiveId} />
 
-        {/* ─── Desktop / Tablet Layout ─── */}
+        {/* Main Area — responds to sidebar selection */}
         <div className="hidden md:flex flex-1 flex-col overflow-hidden">
-          {/* Main Area: Chart + Right Panel */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Chart — main area */}
-            <div className="flex-1 flex flex-col overflow-hidden border-r border-[var(--border)]">
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <ChartArea />
-              </div>
-            </div>
-
-            {/* Right Panel */}
-            <div className="w-80 xl:w-96 shrink-0 overflow-hidden mobile-hidden">
-              <RightPanel />
-            </div>
-          </div>
-
-          {/* AI Agent Control Panel */}
-          <AIPanel
-            collapsed={aiPanelCollapsed}
-            onToggle={() => setAiPanelCollapsed(!aiPanelCollapsed)}
-          />
+          {renderPage(activeId)}
         </div>
 
         {/* ─── Mobile Layout (< 768px) ─── */}
@@ -75,9 +74,10 @@ export default function DashboardPage() {
                 return (
                   <button
                     key={item.id}
+                    onClick={() => setActiveId(item.id)}
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0',
-                      item.active
+                      activeId === item.id
                         ? 'bg-[var(--accent-purple-glow)] text-[var(--accent-purple)] border border-[var(--accent-purple)]/30'
                         : 'text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]'
                     )}
@@ -91,26 +91,13 @@ export default function DashboardPage() {
             <ThemeToggle className="!w-8 !h-8" />
           </div>
 
-          {/* Chart — full width on mobile */}
+          {/* Page content */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            <ChartArea />
-          </div>
-
-          {/* Mobile Bottom Sheet Tabs */}
-          <div className="flex border-t border-[var(--border)] bg-[var(--bg-surface)] shrink-0">
-            <button className="flex-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] border-t-2 border-[var(--accent)]" style={{ marginTop: '-1px' }}>
-              Order Book
-            </button>
-            <button className="flex-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
-              Trades
-            </button>
-            <button className="flex-1 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
-              Agents
-            </button>
+            {renderPage(activeId)}
           </div>
         </div>
 
-        {/* Mobile menu drawer overlay */}
+        {/* Mobile menu drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobileMenuOpen(false)}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" />
@@ -139,9 +126,10 @@ export default function DashboardPage() {
                   return (
                     <button
                       key={item.id}
+                      onClick={() => { setActiveId(item.id); setMobileMenuOpen(false); }}
                       className={cn(
                         'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
-                        item.active
+                        activeId === item.id
                           ? 'bg-[var(--accent-purple-glow)] text-[var(--accent-purple)]'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
                       )}
